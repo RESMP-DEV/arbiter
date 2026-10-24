@@ -1,0 +1,26 @@
+{
+  "capabilities": [
+    "coordination",
+    "local",
+    "git",
+    "services"
+  ],
+  "description": "Daemonless local resource leases, collision scan, guarded git, and launchd restart protocol for concurrent coding agents.",
+  "entry": "arbiter",
+  "name": "arbiter",
+  "pinned_revision": "04381ba19e5e4bd53803205c91b8593da2be18a2",
+  "probe": {
+    "command": [
+      "arbiter",
+      "doctor"
+    ],
+    "expect_exit": 0,
+    "timeout_ms": 15000
+  },
+  "state_paths": [
+    "/Users/kearm/.local/state/arbiter",
+    "/Users/kearm/.config/arbiter"
+  ],
+  "upstream": "https://github.com/RESMP-DEV/arbiter",
+  "version": "0.1.0"
+}
