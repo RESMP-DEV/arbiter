@@ -111,6 +111,18 @@ arbiter shim status
 
 Install it only after reading [docs/integrations.md](docs/integrations.md); shadowing git is powerful and deliberately opt-in.
 
+## Toolbelt integration
+
+The local toolbelt wraps the two CCR boundaries where collisions actually occur:
+
+```bash
+ccr-worker-lease --cwd /path/to/worktree -- <ccr-worker args>
+ccr-service-restart main --wait 5m
+install-arbiter
+```
+
+`ccr-worker-lease` runs the worker under `arbiter run --auto` and fails closed if Arbiter is missing. `ccr-service-restart` maps `main`, `worker`, `auth`, `ocr`, `portal`, and `ocr-webhook` to their launchd labels and uses the service protocol below. The ccr-rust router, admission slots, and state store are unchanged: routing owns model admission, Arbiter owns machine resources. See the toolbelt README for details.
+
 ## Service restarts
 
 Restarting a shared service is the highest-risk routine operation in this environment. Arbiter makes it a protocol:

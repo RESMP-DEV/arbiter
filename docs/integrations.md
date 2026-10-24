@@ -74,6 +74,18 @@ The shim is a symlink named `git` to the arbiter binary. When invoked as `git`, 
 
 Remove it with `arbiter shim uninstall --path ~/.local/bin/git`.
 
+## Toolbelt wrappers
+
+The local toolbelt ships three entry points:
+
+```bash
+install-arbiter                                  # build/install from ~/arbiter
+ccr-worker-lease --cwd "$PWD" -- <ccr-worker args>
+ccr-service-restart main --wait 5m
+```
+
+Use `ccr-worker-lease` for every CCR worker launch. It resolves `--cwd`, claims that worktree exclusively, and execs `arbiter run --auto`. It fails closed when Arbiter is unavailable; `--unguarded` is the explicit bypass. Use `ccr-service-restart` instead of a bare `launchctl kickstart -k`; it routes through `arbiter service restart` with the idle, new-PID, and health checks. The router and worker launcher are not modified.
+
 ## CCR workers
 
 CCR workers are `codex exec` processes launched by a Python supervisor. Two options:
