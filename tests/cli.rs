@@ -665,22 +665,26 @@ fn service_restart_parses_prometheus_idle_metrics() {
 
     let pid_file = fixture.dir.path().join("launchd.pid");
     let script = fixture.dir.path().join("launchctl");
+    let invocation_file = fixture.dir.path().join("launchctl-invocation");
     fs::write(
         &script,
         format!(
             r#"#!/bin/bash
 state="{}"
+invocations="{}"
 if [ "$1" = "list" ]; then
   if [ -f "$state" ]; then echo "\"PID\" = $(cat "$state");"; else echo "\"PID\" = 0;"; fi
   exit 0
 fi
 if [ "$1" = "kickstart" ]; then
   echo 4242 > "$state"
+  printf '%s\n' "$@" > "$invocations"
   exit 0
 fi
 exit 1
 "#,
-            pid_file.display()
+            pid_file.display(),
+            invocation_file.display()
         ),
     )
     .unwrap();
@@ -713,5 +717,14 @@ health_timeout = "2s"
     let report: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["after_pid"], 4242);
     assert_eq!(report["dry_run"], false);
+    let invocation_lines: Vec<_> = fs::read_to_string(&invocation_file)
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    assert_eq!(invocation_lines[0], "kickstart");
+    assert_eq!(invocation_lines[1], "-k");
+    assert!(invocation_lines[2].starts_with("gui/"));
+    assert!(invocation_lines[2].ends_with("/demo"));
     assert_eq!(fixture.lease_count(), 0);
 }

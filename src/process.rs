@@ -187,7 +187,7 @@ pub fn launchctl_pid(label: &str) -> Option<u32> {
 pub fn launchctl_kickstart(label: &str) -> std::io::Result<std::process::ExitStatus> {
     let binary = std::env::var("ARBITER_LAUNCHCTL_BIN").unwrap_or_else(|_| "launchctl".into());
     Command::new(binary)
-        .args(["kickstart", "-k", &format!("gui/{}", uid()), label])
+        .args(["kickstart", "-k", &format!("gui/{}/{}", uid(), label)])
         .status()
 }
 

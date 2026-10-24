@@ -63,6 +63,31 @@ The design is deliberately daemonless. A local SQLite database in WAL mode, writ
 
 **Non-claims.** The suite does not prove live launchd restarts, does not prove enforcement against agents that bypass all Arbiter entry points, and does not validate cross-host behavior.
 
+### 2026-10-24: launchd service-target repair
+
+**Objective.** Keep the cataloged CCR restart path safe and operational while
+activating a new fallback route.
+
+**Defect.** `process::launchctl_kickstart` passed `gui/<uid>` and the label as
+two arguments. macOS `launchctl` requires one service target,
+`gui/<uid>/<label>`, so every real guarded restart failed with launchctl usage
+exit 64. No listener was restarted by those failed attempts. The prior fake
+launcher test only checked exit behavior and did not inspect the invocation.
+
+**Repair.** The process boundary now passes one combined service target, and the
+service-restart test records and asserts the exact fake `launchctl` arguments.
+The resulting release binary was installed locally before four real CCR
+listeners were restarted. Each restart observed zero active requests, replaced
+its PID, passed `/health`, and released the service claim.
+
+**Non-claims.** This is still a fake-launcher unit test plus live launchd
+activation evidence, not a disposable launchd integration test. The fix does not
+change lease semantics, idle polling, health verification, or launchd behavior
+on non-macOS systems.
+
+The durable evidence is
+`evidence/2026-10-24-launchd-service-target.md`.
+
 ## Next gates
 
 - Install the release binary and host config; run `arbiter scan` against the real worktrees and services for one week.
