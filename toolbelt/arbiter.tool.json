@@ -7,7 +7,7 @@
   "description": "Daemonless local resource leases, collision scan, guarded git, and launchd restart protocol for concurrent coding agents.",
   "entry": "arbiter",
   "name": "arbiter",
-  "pinned_revision": "ea7a417ca1050c5ca15297e942912aa99b3013e9",
+  "pinned_revision": "968178e9640e2e12cfaaeafbc063938e845af1f7",
   "probe": {
     "command": [
       "arbiter",
