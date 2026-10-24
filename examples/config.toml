@@ -1,0 +1,44 @@
+# Arbiter machine config (generic template).
+# Copy to ~/.config/arbiter/config.toml and adjust.
+
+[defaults]
+ttl = "30m"
+heartbeat = "10s"
+wait = "0s"
+git_lease_ttl = "5m"
+
+[paths]
+# Omit for auto: case-insensitive on macOS, case-sensitive elsewhere.
+# case_insensitive = true
+
+[pools]
+build = 2
+heavy = 1
+
+[caches]
+uv = "~/.cache/uv"
+hf = "~/.cache/huggingface"
+
+[scan]
+roots = [
+  "~/src/project-a",
+  "~/src/project-b",
+]
+known_ports = [8000, 8787]
+stale_lock_after = "10m"
+include_dirty = true
+
+[services."com.example.portal"]
+port = 8000
+# Optional idle gate: poll until the JSON key equals idle_value.
+idle_url = "http://127.0.0.1:8000/metrics"
+idle_key = "active_requests"
+idle_value = 0
+idle_timeout = "60s"
+# Optional health gate. Without it, restart success requires a new launchd PID.
+health_url = "http://127.0.0.1:8000/health"
+health_timeout = "60s"
+
+[git]
+# binary = "/usr/bin/git"
+guard = true

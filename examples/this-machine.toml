@@ -1,0 +1,76 @@
+# Live configuration for the M4 Max main machine (2026-10-23).
+# Install with: cp examples/this-machine.toml ~/.config/arbiter/config.toml
+
+[defaults]
+ttl = "30m"
+heartbeat = "10s"
+wait = "0s"
+git_lease_ttl = "5m"
+
+[paths]
+case_insensitive = true
+
+[pools]
+build = 2
+heavy = 1
+
+[caches]
+uv = "/Users/kearm/.cache/uv"
+hf = "/Users/kearm/.cache/huggingface"
+codex-skills = "/Users/kearm/.codex/skills/.system"
+
+[scan]
+roots = [
+  "/Users/kearm/lapis",
+  "/Users/kearm/AlphaHENG",
+  "/Users/kearm/ZCode",
+  "/Users/kearm/peeklytic",
+  "/Users/kearm/ccr-rust",
+  "/Users/kearm/omni-use",
+]
+known_ports = [3456, 3457, 3458, 3461, 3462, 8000, 8787, 8788, 19530, 6379]
+stale_lock_after = "10m"
+include_dirty = true
+
+[services."com.kearm.ccr-rust"]
+port = 3456
+idle_url = "http://127.0.0.1:3456/metrics"
+idle_key = "ccr_active_requests"
+health_url = "http://127.0.0.1:3456/health"
+idle_timeout = "2m"
+health_timeout = "1m"
+
+[services."com.kearm.ccr-glm-workers"]
+port = 3457
+idle_url = "http://127.0.0.1:3457/metrics"
+idle_key = "ccr_active_requests"
+health_url = "http://127.0.0.1:3457/health"
+idle_timeout = "2m"
+health_timeout = "1m"
+
+[services."com.kearm.ccr-ocr"]
+port = 3458
+idle_url = "http://127.0.0.1:3458/metrics"
+idle_key = "ccr_active_requests"
+health_url = "http://127.0.0.1:3458/health"
+idle_timeout = "2m"
+health_timeout = "1m"
+
+[services."com.kearm.ccr-rust-auth"]
+port = 3461
+idle_url = "http://127.0.0.1:3461/metrics"
+idle_key = "ccr_active_requests"
+health_url = "http://127.0.0.1:3461/health"
+idle_timeout = "2m"
+health_timeout = "1m"
+
+[services."com.resmp.peeklytic.portal"]
+port = 8000
+health_timeout = "1m"
+
+[services."com.alphaheng.ocr-webhook"]
+port = 8787
+health_timeout = "1m"
+
+[git]
+guard = true

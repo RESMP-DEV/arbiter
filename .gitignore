@@ -1,0 +1,8 @@
+/target
+/build
+/.worktrees
+/.sindexer
+*.log
+.DS_Store
+__pycache__/
+*.pyc
