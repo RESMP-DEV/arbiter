@@ -1,14 +1,13 @@
 {
   "capabilities": [
-    "coordination",
-    "local",
-    "git",
-    "services"
+    "agent-cli",
+    "monitor",
+    "audit"
   ],
   "description": "Daemonless local resource leases, collision scan, guarded git, and launchd restart protocol for concurrent coding agents.",
   "entry": "arbiter",
   "name": "arbiter",
-  "pinned_revision": "04381ba19e5e4bd53803205c91b8593da2be18a2",
+  "pinned_revision": "9e062aa16a197718c3b23478fff1d0f587e99e6e",
   "probe": {
     "command": [
       "arbiter",
