@@ -189,11 +189,7 @@ fn restart_locked(
             if !(200..300).contains(&status) {
                 return Ok(false);
             }
-            let json: serde_json::Value = serde_json::from_str(&body)
-                .map_err(|e| Error::Failed(format!("idle endpoint returned non-JSON: {e}")))?;
-            let value = json_path(&json, key)
-                .ok_or_else(|| Error::Failed(format!("idle key {key:?} missing from {url}")))?;
-            Ok(*value == config.idle_value)
+            idle_matches(&body, key, &config.idle_value)
         })?;
     }
     let idle_waited = idle_started.elapsed().as_secs_f64();
@@ -253,6 +249,56 @@ where
         }
         std::thread::sleep(Duration::from_millis(250));
     }
+}
+
+/// Idle endpoints may return JSON or Prometheus text exposition. CCR's
+/// /metrics endpoint is Prometheus text; accept both rather than assuming JSON.
+fn idle_matches(body: &str, key: &str, expected: &serde_json::Value) -> Result<bool> {
+    let expected_number = expected
+        .as_f64()
+        .ok_or_else(|| Error::Failed("idle_value must be numeric".into()))?;
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(body.trim()) {
+        let value = json_path(&json, key)
+            .ok_or_else(|| Error::Failed(format!("idle key {key:?} missing from JSON response")))?;
+        return Ok(value
+            .as_f64()
+            .map(|value| (value - expected_number).abs() <= f64::EPSILON)
+            .unwrap_or(false));
+    }
+    let mut found = false;
+    let mut all_idle = true;
+    for line in body.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut fields = line.split_whitespace();
+        let Some(metric) = fields.next() else {
+            continue;
+        };
+        let name = metric.split('{').next().unwrap_or(metric);
+        if name != key {
+            continue;
+        }
+        let Some(raw_value) = fields.next() else {
+            continue;
+        };
+        found = true;
+        let value: f64 = raw_value.parse().map_err(|_| {
+            Error::Failed(format!(
+                "metric {key} has a non-numeric value {raw_value:?}"
+            ))
+        })?;
+        if (value - expected_number).abs() > f64::EPSILON {
+            all_idle = false;
+        }
+    }
+    if !found {
+        return Err(Error::Failed(format!(
+            "idle metric {key:?} was not present in the response"
+        )));
+    }
+    Ok(all_idle)
 }
 
 fn json_path<'a>(value: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
@@ -331,6 +377,25 @@ mod tests {
         assert_eq!(json_path(&value, "a.b"), Some(&serde_json::json!(0)));
         assert_eq!(json_path(&value, "c"), Some(&serde_json::json!(2)));
         assert_eq!(json_path(&value, "a.x"), None);
+    }
+
+    #[test]
+    fn parses_prometheus_idle_metrics() {
+        let idle =
+            "# HELP ccr_active_requests in flight\nccr_active_requests 0\nccr_active_streams 2\n";
+        assert!(idle_matches(idle, "ccr_active_requests", &serde_json::json!(0)).unwrap());
+        let busy = "ccr_active_requests 3\n";
+        assert!(!idle_matches(busy, "ccr_active_requests", &serde_json::json!(0)).unwrap());
+        let labelled = "ccr_active_requests{model=\"x\"} 0\n";
+        assert!(idle_matches(labelled, "ccr_active_requests", &serde_json::json!(0)).unwrap());
+        assert!(idle_matches("other 0\n", "ccr_active_requests", &serde_json::json!(0)).is_err());
+    }
+
+    #[test]
+    fn parses_json_idle_metrics() {
+        let body = r#"{"active": 0}"#;
+        assert!(idle_matches(body, "active", &serde_json::json!(0)).unwrap());
+        assert!(!idle_matches(body, "active", &serde_json::json!(1)).unwrap());
     }
 
     #[test]

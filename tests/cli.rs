@@ -621,3 +621,97 @@ fn git_clean_refuses_a_live_agent_in_the_worktree() {
     let _ = live.kill();
     let _ = live.wait();
 }
+
+#[test]
+fn service_restart_parses_prometheus_idle_metrics() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let fixture = Fixture::new();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    listener.set_nonblocking(true).unwrap();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_thread = stop.clone();
+    let server = thread::spawn(move || {
+        while !stop_thread.load(Ordering::SeqCst) {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let mut buffer = [0u8; 1024];
+                    let _ = stream.read(&mut buffer);
+                    let request = String::from_utf8_lossy(&buffer);
+                    let (status, body) = if request.starts_with("GET /metrics") {
+                        ("200 OK", "ccr_active_requests 0\n")
+                    } else if request.starts_with("GET /health") {
+                        ("200 OK", "ok")
+                    } else {
+                        ("404 Not Found", "no")
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = stream.write_all(response.as_bytes());
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let pid_file = fixture.dir.path().join("launchd.pid");
+    let script = fixture.dir.path().join("launchctl");
+    fs::write(
+        &script,
+        format!(
+            r#"#!/bin/bash
+state="{}"
+if [ "$1" = "list" ]; then
+  if [ -f "$state" ]; then echo "\"PID\" = $(cat "$state");"; else echo "\"PID\" = 0;"; fi
+  exit 0
+fi
+if [ "$1" = "kickstart" ]; then
+  echo 4242 > "$state"
+  exit 0
+fi
+exit 1
+"#,
+            pid_file.display()
+        ),
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(
+        fixture.config(),
+        format!(
+            r#"[services."demo"]
+port = {port}
+idle_url = "http://127.0.0.1:{port}/metrics"
+idle_key = "ccr_active_requests"
+health_url = "http://127.0.0.1:{port}/health"
+idle_timeout = "2s"
+health_timeout = "2s"
+"#
+        ),
+    )
+    .unwrap();
+
+    let output = fixture
+        .arb("a")
+        .env("ARBITER_LAUNCHCTL_BIN", &script)
+        .args(["--json", "service", "restart", "demo"])
+        .output()
+        .unwrap();
+    stop.store(true, Ordering::SeqCst);
+    let _ = server.join();
+    assert!(output.status.success(), "{}", stderr(&output));
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["after_pid"], 4242);
+    assert_eq!(report["dry_run"], false);
+    assert_eq!(fixture.lease_count(), 0);
+}
