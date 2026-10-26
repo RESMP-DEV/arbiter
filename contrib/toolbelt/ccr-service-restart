@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Restart a CCR-related launchd listener through Arbiter's service protocol.
+#
+# The protocol serializes concurrent restarts, waits for the listener's
+# Prometheus idle gauge, requires a new PID, and verifies /health before
+# releasing the service claim. This is the safe replacement for a bare
+# `launchctl kickstart -k` or a second manual listener.
+set -euo pipefail
+
+ARBITER_BIN="${ARBITER_BIN:-arbiter}"
+
+usage() {
+  cat <<'EOF'
+usage: ccr-service-restart <service|label> [arbiter service restart flags]
+
+Services:
+  main          com.kearm.ccr-rust            :3456
+  worker        com.kearm.ccr-glm-workers     :3457
+  glm-workers   alias for worker
+  auth          com.kearm.ccr-rust-auth       :3461
+  ocr           com.kearm.ccr-ocr             :3458
+  portal        com.resmp.peeklytic.portal    :8000
+  ocr-webhook   com.alphaheng.ocr-webhook     :8787
+
+A dotted launchd label is passed through unchanged. Additional flags go to
+`arbiter service restart`, for example --wait 5m, --dry-run, --json, or
+--health-timeout 30s.
+
+Options:
+  --list        Print the service map and exit
+  --help        Show this help
+
+Environment:
+  ARBITER_BIN   arbiter executable (default: arbiter)
+EOF
+}
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  usage
+  exit 0
+fi
+if [ "${1:-}" = "--list" ]; then
+  cat <<'EOF'
+main          com.kearm.ccr-rust         3456
+worker        com.kearm.ccr-glm-workers  3457
+auth          com.kearm.ccr-rust-auth    3461
+ocr           com.kearm.ccr-ocr          3458
+portal        com.resmp.peeklytic.portal 8000
+ocr-webhook   com.alphaheng.ocr-webhook  8787
+EOF
+  exit 0
+fi
+
+if [ $# -eq 0 ]; then
+  usage >&2
+  exit 2
+fi
+
+service="$1"
+shift
+
+case "$service" in
+  main) label="com.kearm.ccr-rust" ;;
+  worker|glm-workers) label="com.kearm.ccr-glm-workers" ;;
+  auth) label="com.kearm.ccr-rust-auth" ;;
+  ocr) label="com.kearm.ccr-ocr" ;;
+  portal) label="com.resmp.peeklytic.portal" ;;
+  ocr-webhook) label="com.alphaheng.ocr-webhook" ;;
+  *.*) label="$service" ;;
+  *)
+    printf 'ccr-service-restart: unknown service %s\n' "$service" >&2
+    printf 'use --list to see the map, or pass a dotted launchd label\n' >&2
+    exit 2
+    ;;
+esac
+
+if ! command -v "$ARBITER_BIN" >/dev/null 2>&1; then
+  printf 'ccr-service-restart: arbiter not found; refusing an unguarded restart\n' >&2
+  printf 'install arbiter with install-arbiter\n' >&2
+  exit 6
+fi
+
+printf 'ccr-service-restart: %s -> %s\n' "$service" "$label" >&2
+exec "$ARBITER_BIN" service restart "$label" "$@"

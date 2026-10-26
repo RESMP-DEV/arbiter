@@ -19,6 +19,8 @@ The local traces contain recurring, concrete collisions:
 
 The failure is structural: agents are disciplined in their own context, but nothing gives them a shared, crash-safe view of machine-local resources.
 
+None of this was designed up front as an anti-collision system, and nothing in it manages deadlock in the abstract. Each mechanism answers one observed failure, through the same loop every time: a collision shows up in traces or an incident, the smallest customized tooling that removes that failure class gets built, and a receipt records what the fix does not prove. That loop — build tooling for the failure you actually hit, not the one you can imagine — is the practical best case for running agent fleets today, and this repository is what it produces.
+
 ## Install
 
 Requires Rust and macOS or Linux. SQLite is bundled.
@@ -121,7 +123,7 @@ ccr-service-restart main --wait 5m
 install-arbiter
 ```
 
-`ccr-worker-lease` runs the worker under `arbiter run --auto` and fails closed if Arbiter is missing. `ccr-service-restart` maps `main`, `worker`, `auth`, `ocr`, `portal`, and `ocr-webhook` to their launchd labels and uses the service protocol below. The ccr-rust router, admission slots, and state store are unchanged: routing owns model admission, Arbiter owns machine resources. See the toolbelt README for details.
+`ccr-worker-lease` runs the worker under `arbiter run --auto` and fails closed if Arbiter is missing. `ccr-service-restart` maps `main`, `worker`, `auth`, `ocr`, `portal`, and `ocr-webhook` to their launchd labels and uses the service protocol below. The ccr-rust router, admission slots, and state store are unchanged: routing owns model admission, Arbiter owns machine resources. Vendored copies of both scripts ship in [contrib/toolbelt/](contrib/toolbelt/) with provenance pinned; the toolbelt repository remains canonical.
 
 ## Service restarts
 

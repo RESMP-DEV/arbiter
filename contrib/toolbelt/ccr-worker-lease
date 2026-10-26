@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Launch a CCR worker under an Arbiter worktree lease.
+#
+# ccr-worker's own slot locks serialize model/provider concurrency. They do not
+# lease the worker's cwd, so two workers can be pointed at the same checkout.
+# This wrapper makes the cwd exclusive for the worker's lifetime and fails
+# closed if Arbiter is unavailable.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: ccr-worker-lease [--read-only] [--unguarded] --cwd DIR -- <ccr-worker args>
+
+Wraps ccr-worker in `arbiter run --auto`, claiming the --cwd worktree for the
+worker's lifetime. All arguments after the wrapper flags are passed through.
+
+Options:
+  --read-only   Claim the worktree shared instead of exclusive
+  --unguarded   Run ccr-worker directly when arbiter is unavailable
+  --help        Show this help
+
+Environment:
+  ARBITER_BIN       arbiter executable (default: arbiter)
+  CCR_WORKER_BIN    worker executable (default: codex-ccr-worker, then ccr-worker)
+  CCR_WORKER_LEASE_REASON  lease reason (default: ccr worker)
+EOF
+}
+
+ARBITER_BIN="${ARBITER_BIN:-arbiter}"
+WORKER_BIN="${CCR_WORKER_BIN:-}"
+REASON="${CCR_WORKER_LEASE_REASON:-ccr worker}"
+READ_ONLY=0
+UNGUARDED=0
+ARGS=()
+TARGET_CWD="$PWD"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --read-only)
+      READ_ONLY=1
+      shift
+      ;;
+    --unguarded)
+      UNGUARDED=1
+      shift
+      ;;
+    --)
+      shift
+      while [ $# -gt 0 ]; do ARGS+=("$1"); shift; done
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Resolve --cwd/--cwd=DIR before claiming. The worker will also receive it.
+i=0
+while [ "$i" -lt "${#ARGS[@]}" ]; do
+  arg="${ARGS[$i]}"
+  case "$arg" in
+    --cwd)
+      i=$((i + 1))
+      if [ "$i" -lt "${#ARGS[@]}" ]; then
+        TARGET_CWD="${ARGS[$i]}"
+      fi
+      ;;
+    --cwd=*)
+      TARGET_CWD="${arg#--cwd=}"
+      ;;
+  esac
+  i=$((i + 1))
+done
+
+if [ ! -d "$TARGET_CWD" ]; then
+  printf 'ccr-worker-lease: cwd does not exist: %s\n' "$TARGET_CWD" >&2
+  exit 2
+fi
+cd "$TARGET_CWD"
+
+if [ -z "$WORKER_BIN" ]; then
+  for candidate in codex-ccr-worker ccr-worker; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      WORKER_BIN="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "$WORKER_BIN" ] || ! command -v "$WORKER_BIN" >/dev/null 2>&1; then
+  printf 'ccr-worker-lease: no ccr-worker launcher found; set CCR_WORKER_BIN\n' >&2
+  exit 6
+fi
+
+if ! command -v "$ARBITER_BIN" >/dev/null 2>&1; then
+  if [ "$UNGUARDED" -eq 1 ]; then
+    printf 'ccr-worker-lease: arbiter not found; launching unguarded by request\n' >&2
+    exec "$WORKER_BIN" ${ARGS[@]+"${ARGS[@]}"}
+  fi
+  printf 'ccr-worker-lease: arbiter not found; refusing an unleased worker\n' >&2
+  printf 'install arbiter with install-arbiter, or pass --unguarded to override\n' >&2
+  exit 6
+fi
+
+mode_flags=()
+if [ "$READ_ONLY" -eq 1 ]; then
+  mode_flags+=(--read-only)
+fi
+
+exec "$ARBITER_BIN" run --auto ${mode_flags[@]+"${mode_flags[@]}"} \
+  --reason "$REASON" -- "$WORKER_BIN" ${ARGS[@]+"${ARGS[@]}"}

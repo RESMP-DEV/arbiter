@@ -44,6 +44,20 @@ The design is deliberately daemonless. A local SQLite database in WAL mode, writ
 8. **JSON is a public surface.** Field renames require a schema version bump.
 9. **No network.** The tool does not listen on a socket.
 
+## Deadlock resistance
+
+Nothing here is an up-front anti-deadlock design. Every mechanism below exists because a specific, dated failure was observed on this machine: the wrong-branch commit produced branch verification (contract 6), the restart that dropped in-flight worker requests produced the idle-gated service protocol, the commandeered worktree produced exact worktree claims (contract 4). Coordination tooling that holds up past ten to twenty concurrent agents does so by closing the ways coordination itself fails, and each way has a name:
+
+- **No coordinator process.** Lease state is a SQLite database in WAL mode; every command opens it for one `BEGIN IMMEDIATE` transaction and exits. A crashed agent leaves rows, not a dead server that everyone else blocks on, and recovery is the next transaction's reaper rather than a human restarting a service.
+- **Dead holders cannot pin resources.** Leases carry holder PID and process start time, and every transaction reaps leases whose holder is gone (contract 2); TTL bounds the rest. The classic fleet failure — a crashed agent holds the lease everyone else waits on — terminates in bounded time with no operator action.
+- **No upgrade deadlocks.** Sessions never hold a long-lived shared refs lease that later needs upgrading to exclusive; ref mutation is claimed for exactly the duration of the mutating command (contract 5). The shared-to-exclusive upgrade cycle, a standard reader-writer deadlock, cannot form.
+- **No barging.** Waiters are FIFO: a released lease goes to the longest waiter, so sustained contention degrades to queueing instead of livelock.
+- **Granularity matches contention.** Worktree claims are exact to the checkout, so agents on one repository contend only when they truly share a checkout; sibling worktrees never serialize behind a repo-global lock.
+- **The tool cannot wedge the machine.** Detection is read-only and claims never delete locks, kill processes, or remove worktrees (contract 3). The coordinator has no action that can deadlock the resources it coordinates.
+- **No circular wait across concerns.** The ccr-rust router owns model admission; Arbiter owns machine resources. Neither holds one while waiting on the other, and neither embeds the other's state.
+
+Honest scope: these are design properties, exercised by the suite (cross-process conflict, queue acquisition after release, dead-holder reaping) and consistent with one live probe (ten concurrent ZCode sessions, 101 listening sockets). No dedicated large-N soak test exists; in practice the concurrency ceilings on this machine come from launcher policy (twelve CCR workers) and machine resources, not lease coordination. Coordination is machine-local; cross-host remains an open choice above.
+
 ## Work log
 
 ### 2026-10-23: research and v1
