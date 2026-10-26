@@ -1,5 +1,7 @@
 # Arbiter
 
+[![Release](https://img.shields.io/github/v/release/RESMP-DEV/arbiter)](https://github.com/RESMP-DEV/arbiter/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
+
 Local resource leases and collision detection for concurrent coding agents.
 
 Arbiter is a single-user CLI that gives Codex, Claude Code, ZCode, Qoder, CCR workers, and scripts a shared answer to one question: **is another process already using this worktree, repository, port, service, cache, or machine slot?**
@@ -32,6 +34,8 @@ arbiter doctor
 ```
 
 Optional machine config: copy [`examples/config.toml`](examples/config.toml) to `~/.config/arbiter/config.toml` and adjust roots, ports, services, and caches.
+
+Uninstall by removing the binary; if the git shim is installed, remove it first with `arbiter shim uninstall --path ~/.local/bin/git`.
 
 ## Quick start
 
@@ -165,6 +169,8 @@ just quick     # fmt and clippy only
 ```
 
 Receipts land in `build/reports/<mode>/receipt.json`. There is no GitHub Actions workflow; verification runs locally by policy.
+
+The [wiki](https://github.com/RESMP-DEV/arbiter/wiki) is a generated view of the repository docs, rebuilt with `python3 scripts/sync_wiki.py`; the repository stays canonical.
 
 ## License
 
