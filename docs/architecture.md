@@ -102,6 +102,30 @@ on non-macOS systems.
 The durable evidence is
 `evidence/2026-10-24-launchd-service-target.md`.
 
+### 2026-10-25: public publication and fleet-scale wiring
+
+**Objective.** Publish the repository as the public artifact for this
+machine's anti-collision wiring and make the story self-contained: why the
+tool exists, what it closes, and where the boundary scripts live.
+
+**Changes.** Vendored `ccr-worker-lease` and `ccr-service-restart` into
+`contrib/toolbelt/` (pinned to toolbelt `3f9e57a`); added the "Deadlock
+resistance" section naming each coordination-failure class and its
+originating incident; added README framing for the evidence-first loop
+(observed failure, smallest customized repair, receipt). Visibility flipped
+to public after a history credential scan and a confidentiality-terminology
+grep came back clean.
+
+**Verification.** `just check` passed in a dedicated worktree (receipt
+`build/reports/local/receipt.json`); push fast-forwarded `main` to `5150673`
+through `arbiter git`; unauthenticated repo page, raw README, and API
+visibility checks returned 200/200/public-MIT; repo-level Actions confirmed
+disabled. Durable evidence: `evidence/2026-10-25-publication.md`.
+
+**Non-claims.** Design properties, not a large-N soak test; cross-host
+coordination remains an open choice; vendored copies are pinned snapshots,
+not a sync.
+
 ## Next gates
 
 - Install the release binary and host config; run `arbiter scan` against the real worktrees and services for one week.
