@@ -126,6 +126,36 @@ disabled. Durable evidence: `evidence/2026-10-25-publication.md`.
 coordination remains an open choice; vendored copies are pinned snapshots,
 not a sync.
 
+### 2026-10-25: proper-repo polish
+
+**Objective.** Make the public repository self-serve for the
+fleet-coordination use case: a reproducible wiki, an operational playbook,
+the standard guides, and a first release.
+
+**Changes.** `scripts/sync_wiki.py` (with colocated unittest coverage)
+publishes the GitHub wiki as a generated view of the canonical docs;
+`docs/fleet-playbook.md` was curated from a Qoder-lane DeepSeek-Flash draft
+and verified claim-by-claim against the canonical sources;
+`CONTRIBUTING.md` and `SECURITY.md` carry procedure and threat model;
+README gained badges, uninstall guidance, and a wiki pointer. Repository
+gained `has_wiki=true`, ten topics, and release `v0.1.0` with an
+aarch64-apple-darwin asset and checksum.
+
+**Verification.** `just check` passed including the new sync-wiki tests;
+pushes fast-forwarded `main` through `arbiter git`; the unauthenticated repo
+page renders topics, the release, and the README additions. Durable
+evidence: `evidence/2026-10-25-proper-repo-polish.md`.
+
+**Blocker.** GitHub provisions the wiki git repository only on the first
+web-UI page creation; no API or push path exists. The one-click bootstrap is
+documented in the evidence file, after which `scripts/sync_wiki.py` owns all
+wiki content.
+
+**Non-claims.** No wiki pages are live yet; the release asset is unsigned
+and not a reproducible-build claim; the polish audit's remaining items
+(sample outputs, doctor documentation, Linux service restarts, upgrade
+guidance) are accepted gaps.
+
 ## Next gates
 
 - Install the release binary and host config; run `arbiter scan` against the real worktrees and services for one week.
